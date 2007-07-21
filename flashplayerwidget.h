@@ -3,9 +3,8 @@
 #define FLASHPLAYERWIDGET_H
 
 // Qt
-#include <qwidget.h>
-
-class QUrl;
+#include <QWidget>
+#include <QUrl>
 
 class FlashPlayerWidget : public QWidget
 {
@@ -35,7 +34,6 @@ Q_OBJECT
     private:
         void handleMouseEvent( QMouseEvent* event ); 
         void prepareSurface(); 
-        void render();
 
     private:
         class Private;

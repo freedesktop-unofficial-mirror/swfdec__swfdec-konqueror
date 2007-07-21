@@ -2,8 +2,8 @@
 #define FLASHPLAYER_PART_H
 
 // KDE
-#include <kparts/factory.h>
-#include <kparts/part.h>
+#include <KParts/Factory>
+#include <KParts/Part>
 
 
 class QStringList;
@@ -16,10 +16,8 @@ class PartFactory : public KParts::Factory
 protected:
     /** Reimplemented to create Konsole parts. */
     virtual KParts::Part* createPartObject(QWidget* parentWidget = 0,
-                                           const char* something = 0,
                                            QObject* parent = 0,
                                            const char* classname = "KParts::Part",
-                                           const char* something_2 = 0,
                                            const QStringList& args = QStringList());
 };
 

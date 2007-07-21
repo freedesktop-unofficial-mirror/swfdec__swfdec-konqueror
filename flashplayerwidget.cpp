@@ -3,11 +3,11 @@
 #include "flashplayerwidget.h"
 
 // Qt
-#include "qapplication.h"
-#include "qpainter.h"
-#include "qpixmap.h"
-#include "qtimer.h"
-#include "qurl.h"
+#include <QPaintEvent>
+#include <QPainter>
+#include <QTimer>
+#include <QX11Info>
+#include <QtDebug>
 
 // Cairo
 #include <X11/Xlib.h>
@@ -24,7 +24,6 @@ public:
     {
         player = 0;
         loader = 0;
-        backingPixmap = 0;
         surface = 0;
         timer = 0;
         mouseButton = 0;
@@ -32,9 +31,8 @@ public:
 
     SwfdecPlayer* player;
     SwfdecLoader* loader;
-   
-    QPixmap backingPixmap;
     cairo_surface_t* surface;
+    QPixmap backingPixmap;
 
     QTimer* timer;
 
@@ -50,7 +48,7 @@ FlashPlayerWidget::FlashPlayerWidget(QWidget* parent)
     , d(new Private)
 {
     // widget attributes
-    setWFlags( getWFlags() | Qt::WNoAutoErase );
+    setAttribute(Qt::WA_OpaquePaintEvent);
     setMouseTracking(true);
     
     // load swfdec 
@@ -58,6 +56,8 @@ FlashPlayerWidget::FlashPlayerWidget(QWidget* parent)
     {
         swfdec_init();
         Private::swfDecStarted = true;
+
+        qDebug() << "Started swfdec";
     }
     
     // setup player
@@ -65,7 +65,7 @@ FlashPlayerWidget::FlashPlayerWidget(QWidget* parent)
 
     // setup timer to advance movie
     d->timer = new QTimer(this);
-    d->timer->changeInterval(40);
+    d->timer->setInterval(40);
     connect( d->timer , SIGNAL(timeout()) , this , SLOT(advance()) );
 }
 FlashPlayerWidget::~FlashPlayerWidget()
@@ -78,28 +78,31 @@ void FlashPlayerWidget::resizeEvent( QResizeEvent* event )
 }
 void FlashPlayerWidget::prepareSurface()
 {
+    // Qt backing pixmap
+    d->backingPixmap = QPixmap(width(),height());
+    
     // cairo surface
     if ( d->surface )
         cairo_surface_destroy( d->surface );
 
-  d->backingPixmap = QPixmap(width(),height());
-
-  // TODO - Find a way to get correct screen, visual rather
-  // than just the default ones
-  Display* display = d->backingPixmap.x11Display();
-  int screen = d->backingPixmap.x11Screen();
-  void* visual = d->backingPixmap.x11Visual();
-
-  d->surface = cairo_xlib_surface_create(   display , 
-                                            d->backingPixmap.handle(), 
-                                            (Visual*)visual, 
-                                            width(), 
-                                            height() );
+    d->surface = cairo_xlib_surface_create( QX11Info::display() , d->backingPixmap.handle() , 
+                                            (Visual*)(d->backingPixmap.x11Info().visual()) , 
+                                            d->backingPixmap.width() , 
+                                            d->backingPixmap.height() );
 }
 void FlashPlayerWidget::paintEvent( QPaintEvent* event )
 {
+        // create cairo painter
+        cairo_t* painter = cairo_create(d->surface);
+        
+        // render movie
+        swfdec_player_render( d->player , painter , 0 , 0 , width() , height() );
+        
+        // cleanup
+        cairo_show_page(painter);
+        cairo_destroy(painter);
 
-        // copy to screen
+        // copy pixmap to screen
         QPainter qtPainter(this);
         qtPainter.drawPixmap(0,0,d->backingPixmap);
 }
@@ -128,35 +131,22 @@ void FlashPlayerWidget::handleMouseEvent( QMouseEvent* event )
 void FlashPlayerWidget::advance()
 {
     swfdec_player_advance( d->player , swfdec_player_get_next_event(d->player) );
-        
-    render();
-    update();
+    update(); 
 }
-void FlashPlayerWidget::render()
-{
-    // create cairo painter
-    cairo_t* painter = cairo_create(d->surface);                             
-                                                                             
-    // render movie                                                          
-    swfdec_player_render( d->player , painter , 0 , 0 , width() , height() );
-                                                                             
-    // cleanup
-    cairo_show_page(painter);                                                
-    cairo_destroy(painter); 
-}
+
 QSize FlashPlayerWidget::movieSize() const
 {
     int width;
     int height;
 
-    swfdec_player_get_image_size( d->player , &width , &height );
-
+    swfdec_player_get_image_size(d->player,&width,&height);
     return QSize(width,height);
 }
+
 void FlashPlayerWidget::play()
 {
     if ( !d->timer->isActive() )
-        d->timer->start(40,FALSE);
+        d->timer->start();
 }
 void FlashPlayerWidget::pause()
 {
@@ -164,7 +154,7 @@ void FlashPlayerWidget::pause()
 }
 void FlashPlayerWidget::load(const QUrl& url)
 {
-    d->loader = swfdec_loader_new_from_file(url.path().utf8().data());
+    d->loader = swfdec_loader_new_from_file(url.toLocalFile().toUtf8().constData());
     swfdec_player_set_loader(d->player,d->loader);
 }
 

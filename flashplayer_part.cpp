@@ -2,9 +2,6 @@
 // Own
 #include "flashplayer_part.h"
 
-// Qt
-#include <qurl.h>
-
 // Local
 #include "flashplayerwidget.h"
 
@@ -21,10 +18,8 @@ extern "C"
 using namespace FlashPlayer;
 
 KParts::Part* PartFactory::createPartObject( QWidget* parentWidget,
-                                             const char* /* something */,
                                              QObject* parent,
                                              const char* /*classname*/,
-                                             const char* /* something_2 */,
                                              const QStringList& /*args*/)
 {
     return new Part(parentWidget,parent);
@@ -46,7 +41,7 @@ Part::Part(QWidget* parentWidget , QObject* parent)
 }
 bool Part::openFile()
 {
-    d->player->load( QUrl(url().path()) );
+    d->player->load(localFilePath());
     d->player->play();
 
     return true;
